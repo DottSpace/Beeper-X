@@ -18,15 +18,17 @@ Beeper-X works only on Linux systems, because it relies on the native beep comma
 To use it, you must:
 1. Have a PC speaker (internal buzzer) physically installed and enabled in your BIOS  
 2. Install the beep utility:
-    ``` sudo apt install beep ```  
-3. Ensure your user has permission to run beep. In some systems, it may require superuser privileges or access to /dev/console
+    ``` sudo apt install beep ```
+3. Install the beep driver:
+    ```sudo modprobe pcspkr```  
+4. Ensure your user has permission to run beep. In some systems, it may require superuser privileges or access to /dev/console
 
 ---
 
 ## Installation
 
 1. Clone this repository:
-   git clone https://github.com/your-username/beeper-x.git
+   git clone https://github.com/DottSpace/Beeper-X.git
    cd beeper-x
 
 2. Create and activate a virtual environment (optional but recommended):
@@ -38,7 +40,7 @@ To use it, you must:
    pip install -r requirements.txt
 
 4. Run the application:
-   python beeperx.py
+   python3 Beeper-X.py
 
 ---
 
