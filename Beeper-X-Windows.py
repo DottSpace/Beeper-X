@@ -329,7 +329,7 @@ class BeeperX(QMainWindow):
         try:
             beeper_exe = os.path.join(get_base_dir(), "beeper.exe")
             if not os.path.exists(beeper_exe):
-                QMessageBox.critical(self, "❌ Error", f"'beeper.exe' non trovato nella cartella:\n{get_base_dir()}")
+                QMessageBox.critical(self, "Error", f"'beeper.exe' non trovato nella cartella:\n{get_base_dir()}")
                 return
 
             self.status.showMessage("Parsing MIDI...")
@@ -339,9 +339,9 @@ class BeeperX(QMainWindow):
             self.btn_run.setEnabled(True)
             self.status.showMessage(f"Loaded {os.path.basename(midi_path)} - {len(self.current_notes)} events ready.")
             self.progress.setValue(0)
-            QMessageBox.information(self, "✅ Ready", f"File parsed successfully!\nEvents: {len(self.current_notes)}")
+            QMessageBox.information(self, "Ready", f"File parsed successfully!\nEvents: {len(self.current_notes)}")
         except Exception as e:
-            QMessageBox.critical(self, "❌ Parsing Error", f"Failed to parse MIDI: {e}")
+            QMessageBox.critical(self, "Parsing Error", f"Failed to parse MIDI: {e}")
             self.status.showMessage("Parsing failed.")
 
     def run_playback(self):
