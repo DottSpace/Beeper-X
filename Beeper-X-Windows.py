@@ -307,7 +307,7 @@ class BeeperX(QMainWindow):
         self.apply_stylesheet()
 
     def show_info(self):
-        QMessageBox.information(self, "Beeper-X", "Beeper-X (Beeper Windows Edition)\nConvert & Play MIDI on PC Speaker.\nAuthor: DottSpace \n\nIt uses '/cocafe/pc-beeper' to generate sounds \nLicense: MIT")
+        QMessageBox.information(self, "Beeper-X", "Beeper-X (Beeper Windows Edition)\nConvert & Play MIDI on PC Speaker.\nVersion: 1.1\nAuthor: DottSpace \n\nIt uses '/cocafe/pc-beeper' to generate sounds \n\nLicense: MIT")
 
     def select_file(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select MIDI File", "", "MIDI Files (*.mid *.midi)")
