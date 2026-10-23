@@ -54,7 +54,7 @@ def elevate_if_needed():
         ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, f'"{script}" {params}', None, 1)
         sys.exit(0)
 
-# --------------------- MIDI PARSER SAFE ----------------------------
+# --------------------- MIDI PARSER SAFE (TIMELINE MONOFONICA) ----------------------------
 class MidiToNotesConverter:
     def __init__(self, note_mode='highest'):
         self.note_mode = note_mode
@@ -65,55 +65,63 @@ class MidiToNotesConverter:
 
         current_bpm = 120
         ticks_per_beat = midifile.ticks_per_beat if midifile.ticks_per_beat else 480
-        note_on = []
-        accu_ticks = 0
-        events_list = []
+        
+        active_notes = set()
+        events_timeline = []
+        current_time_ms = 0.0
 
         for event in track:
-            accu_ticks += event.time
-            
+            delta_ms = (event.time / ticks_per_beat) * (60000.0 / current_bpm)
+            current_time_ms += delta_ms
+
             if event.type == 'set_tempo':
                 try:
                     current_bpm = mido.tempo2bpm(event.tempo)
                 except Exception:
                     current_bpm = 120
 
-            if event.type in ['note_off', 'note_on'] and getattr(event, 'velocity', 0) == 0:
-                if note_on and accu_ticks > 0:
-                    ms_duration = self.ticks_to_ms(accu_ticks, current_bpm, ticks_per_beat)
-                    events_list.append((self.select_note(note_on), ms_duration))
-                    accu_ticks = 0
-                try:
-                    note_on.remove(event.note)
-                except ValueError:
-                    pass
             elif event.type == 'note_on':
-                if accu_ticks > 0:
-                    ms_duration = self.ticks_to_ms(accu_ticks, current_bpm, ticks_per_beat)
-                    freq = self.select_note(note_on) if note_on else 0
-                    events_list.append((freq, ms_duration))
-                    accu_ticks = 0
-                note_on.append(event.note)
+                if getattr(event, 'velocity', 0) > 0:
+                    active_notes.add(event.note)
+                else:
+                    active_notes.discard(event.note)
                 
-        return events_list
+                freq = self.select_note(active_notes)
+                events_timeline.append((current_time_ms, freq))
 
-    def ticks_to_ms(self, ticks, bpm, ticks_per_beat):
-        if bpm <= 0 or ticks_per_beat <= 0:
-            return 100
-        ms = (ticks / ticks_per_beat) * (60000.0 / bpm)
-        return max(1, int(ms))
+            elif event.type == 'note_off':
+                active_notes.discard(event.note)
+                freq = self.select_note(active_notes)
+                events_timeline.append((current_time_ms, freq))
+
+        # Conversione della timeline in sequenza pulita (frequenza, durata_ms)
+        notes_sequence = []
+        last_time = 0.0
+        
+        for i in range(len(events_timeline)):
+            t, freq = events_timeline[i]
+            duration = int(t - last_time)
+            
+            if duration > 0:
+                prev_freq = events_timeline[i-1][1] if i > 0 else 0
+                notes_sequence.append((prev_freq, duration))
+            
+            last_time = t
+
+        return notes_sequence
 
     def select_note(self, notes):
         if not notes:
             return 0
+        notes_list = list(notes)
         if self.note_mode == 'highest':
-            note = max(notes)
+            note = max(notes_list)
         elif self.note_mode == 'lowest':
-            note = min(notes)
+            note = min(notes_list)
         elif self.note_mode == 'average':
-            note = sum(notes) // len(notes)
+            note = sum(notes_list) // len(notes_list)
         else:
-            note = notes[-1]
+            note = notes_list[-1]
         
         note = max(0, min(127, note))
         return round(440 * 2 ** ((note - 69) / 12))
@@ -148,7 +156,7 @@ class PlaybackThread(QThread):
                         creationflags=creation_flags
                     )
                     self.current_proc.wait()
-                except Exception as e:
+                except Exception:
                     pass
             else:
                 time.sleep(duration / 1000.0)
@@ -182,10 +190,9 @@ class PlaybackThread(QThread):
 class BeeperX(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(" Beeper-X")
+        self.setWindowTitle("Beeper-X")
         self.setFixedSize(600, 450)
         
-        # Icona favicon interna
         icon_path = resource_path("icon.ico")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
@@ -195,28 +202,23 @@ class BeeperX(QMainWindow):
         self.current_notes = None
         self.setAcceptDrops(True)
 
-        # Central widget
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
         self.layout = QVBoxLayout(self.central_widget)
         self.layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        # Main label
         self.label = QLabel("Open a MIDI file or drag it here")
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.layout.addWidget(self.label)
 
-        # Note mode dropdown
         self.note_mode_combo = QComboBox()
         self.note_mode_combo.addItems(['highest', 'lowest', 'average'])
         self.layout.addWidget(self.note_mode_combo)
 
-        # Output folder / Base Path
         self.output_dir = get_base_dir()
         self.output_label = QLabel(f"Output folder: {self.output_dir}")
         self.layout.addWidget(self.output_label)
 
-        # Buttons
         self.btn_select_file = QPushButton("📂 Open MIDI")
         self.btn_select_file.clicked.connect(self.select_file)
         self.layout.addWidget(self.btn_select_file)
@@ -231,15 +233,12 @@ class BeeperX(QMainWindow):
         self.btn_stop.setEnabled(False)
         self.layout.addWidget(self.btn_stop)
 
-        # Progress bar
         self.progress = QProgressBar()
         self.layout.addWidget(self.progress)
 
-        # Status bar
         self.status = QStatusBar()
         self.setStatusBar(self.status)
 
-        # Menu
         self.menu_bar = QMenuBar()
         self.setMenuBar(self.menu_bar)
         file_menu = self.menu_bar.addMenu("File")
@@ -256,7 +255,6 @@ class BeeperX(QMainWindow):
 
         self.apply_stylesheet()
 
-    # ----------------- Drag & Drop --------------------------
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             event.accept()
@@ -268,7 +266,6 @@ class BeeperX(QMainWindow):
         if urls:
             self.load_midi(urls[0].toLocalFile())
 
-    # ----------------- SETTINGS -----------------------------
     def load_settings(self):
         settings_path = os.path.join(get_base_dir(), SETTINGS_FILE)
         if os.path.exists(settings_path):
@@ -312,7 +309,6 @@ class BeeperX(QMainWindow):
     def show_info(self):
         QMessageBox.information(self, "Beeper-X", "Beeper-X (Beeper Windows Edition)\nConvert & Play MIDI on PC Speaker.\nAuthor: DottSpace \n\nIt uses '/cocafe/pc-beeper' to generate sounds \nLicense: MIT")
 
-    # ----------------- FILE -----------------------------
     def select_file(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select MIDI File", "", "MIDI Files (*.mid *.midi)")
         if file_path:
@@ -324,7 +320,6 @@ class BeeperX(QMainWindow):
             self.output_dir = dir_path
             self.output_label.setText(f"Output folder: {self.output_dir}")
 
-    # ----------------- PARSING & PLAYBACK ----------------------
     def load_midi(self, midi_path):
         try:
             beeper_exe = os.path.join(get_base_dir(), "beeper.exe")
