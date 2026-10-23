@@ -5,6 +5,13 @@ Author: DottSpace12
 License: MIT
 """
 
+"""
+ATTENTION!!!
+this version for linux has not yet been updated,
+so we do not guarantee an
+excellent operation of the program
+"""
+
 import sys, os, json, subprocess, signal
 import mido
 from PyQt6.QtWidgets import (
